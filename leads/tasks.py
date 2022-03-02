@@ -15,8 +15,7 @@ app = Celery("redis://")
 
 
 def get_rendered_html(template_name, context={}):
-    html_content = render_to_string(template_name, context)
-    return html_content
+    return render_to_string(template_name, context)
 
 
 @app.task
@@ -59,7 +58,7 @@ def send_lead_assigned_emails(lead_id, new_assigned_to_list, site_address):
     template_name = "lead_assigned.html"
 
     url = site_address
-    url += "/leads/" + str(lead_instance.id) + "/view/"
+    url += f"/leads/{str(lead_instance.id)}/view/"
 
     context = {
         "lead_instance": lead_instance,
@@ -83,16 +82,16 @@ def send_email_to_assigned_user(
     lead = Lead.objects.get(id=lead_id)
     created_by = lead.created_by
     for user in recipients:
-        recipients_list = []
-        profile = Profile.objects.filter(id=user, is_active=True).first()
-        if profile:
-            recipients_list.append(profile.user.email)
-            context = {}
-            context["url"] = settings.DOMAIN_NAME
-            context["user"] = profile.user
-            context["lead"] = lead
-            context["created_by"] = created_by
-            context["source"] = source
+        if profile := Profile.objects.filter(id=user, is_active=True).first():
+            recipients_list = [profile.user.email]
+            context = {
+                "url": settings.DOMAIN_NAME,
+                "user": profile.user,
+                "lead": lead,
+                "created_by": created_by,
+                "source": source,
+            }
+
             subject = "Assigned a lead for you. "
             html_content = render_to_string(
                 "assigned_to/leads_assigned.html", context=context
@@ -111,30 +110,32 @@ def create_lead_from_file(validated_rows, invalid_rows, user_id, source, company
     profile = Profile.objects.get(id=user_id)
     org = Org.objects.filter(id=company_id).first()
     for row in validated_rows:
-        if not Lead.objects.filter(title=row.get("title")).exists():
-            if re.match(email_regex, row.get("email")) is not None:
-                try:
-                    lead = Lead()
-                    lead.title = row.get("title", "")[:64]
-                    lead.first_name = row.get("first name", "")[:255]
-                    lead.last_name = row.get("last name", "")[:255]
-                    lead.website = row.get("website", "")[:255]
-                    lead.email = row.get("email", "")
-                    lead.phone = row.get("phone", "")
-                    lead.address_line = row.get("address", "")[:255]
-                    lead.city = row.get("city", "")[:255]
-                    lead.state = row.get("state", "")[:255]
-                    lead.postcode = row.get("postcode", "")[:64]
-                    lead.country = row.get("country", "")[:3]
-                    lead.description = row.get("description", "")
-                    lead.status = row.get("status", "")
-                    lead.account_name = row.get("account_name", "")[:255]
-                    lead.created_from_site = False
-                    lead.created_by = profile
-                    lead.org = org
-                    lead.save()
-                except Exception as e:
-                    print(e)
+        if (
+            not Lead.objects.filter(title=row.get("title")).exists()
+            and re.match(email_regex, row.get("email")) is not None
+        ):
+            try:
+                lead = Lead()
+                lead.title = row.get("title", "")[:64]
+                lead.first_name = row.get("first name", "")[:255]
+                lead.last_name = row.get("last name", "")[:255]
+                lead.website = row.get("website", "")[:255]
+                lead.email = row.get("email", "")
+                lead.phone = row.get("phone", "")
+                lead.address_line = row.get("address", "")[:255]
+                lead.city = row.get("city", "")[:255]
+                lead.state = row.get("state", "")[:255]
+                lead.postcode = row.get("postcode", "")[:64]
+                lead.country = row.get("country", "")[:3]
+                lead.description = row.get("description", "")
+                lead.status = row.get("status", "")
+                lead.account_name = row.get("account_name", "")[:255]
+                lead.created_from_site = False
+                lead.created_by = profile
+                lead.org = org
+                lead.save()
+            except Exception as e:
+                print(e)
 
 
 @app.task

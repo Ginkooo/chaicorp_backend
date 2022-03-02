@@ -53,9 +53,8 @@ class CaseCreateSerializer(serializers.ModelSerializer):
             ):
                 raise serializers.ValidationError("Case already exists with this name")
 
-        else:
-            if Case.objects.filter(name__iexact=name, org=self.org).exists():
-                raise serializers.ValidationError("Case already exists with this name")
+        elif Case.objects.filter(name__iexact=name, org=self.org).exists():
+            raise serializers.ValidationError("Case already exists with this name")
         return name
 
     class Meta:

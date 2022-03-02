@@ -74,11 +74,10 @@ class CreateContactSerializer(serializers.ModelSerializer):
                     "Contact already exists with this name"
                 )
 
-        else:
-            if Contact.objects.filter(first_name__iexact=first_name, org=self.org).exists():
-                raise serializers.ValidationError(
-                    "Contact already exists with this name"
-                )
+        elif Contact.objects.filter(first_name__iexact=first_name, org=self.org).exists():
+            raise serializers.ValidationError(
+                "Contact already exists with this name"
+            )
         return first_name
 
     class Meta:

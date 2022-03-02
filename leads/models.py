@@ -80,9 +80,7 @@ class Lead(models.Model):
 
     @property
     def phone_raw_input(self):
-        if str(self.phone) == "+NoneNone":
-            return ""
-        return self.phone
+        return "" if str(self.phone) == "+NoneNone" else self.phone
 
     @property
     def created_on_arrow(self):

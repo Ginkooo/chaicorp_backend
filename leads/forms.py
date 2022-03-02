@@ -20,8 +20,9 @@ def csv_doc_validate(document):
         invalid_each = {}
         if y_index == 0:
             csv_headers = [header_name.lower() for header_name in row if header_name]
-            missing_headers = set(required_headers) - set([r.lower() for r in row])
-            if missing_headers:
+            if missing_headers := set(required_headers) - {
+                r.lower() for r in row
+            }:
                 missing_headers_str = ", ".join(missing_headers)
                 message = "Missing headers: %s" % (missing_headers_str)
                 return {"error": True, "message": message}
@@ -34,16 +35,13 @@ def csv_doc_validate(document):
                     csv_headers[x_index]
                 except IndexError:
                     continue
-                if csv_headers[x_index] in required_headers:
-                    if not cell_value:
-                        # message = 'Missing required value %s for row %s' % (
-                        #     csv_headers[x_index], y_index + 1)
-                        # return {"error": True, "message": message}
-                        invalid_each[csv_headers[x_index]] = cell_value
-                    else:
-                        if csv_headers[x_index] == "email":
-                            if re.match(email_regex, cell_value) is None:
-                                invalid_each[csv_headers[x_index]] = cell_value
+                if csv_headers[x_index] in required_headers and (
+                    cell_value
+                    and csv_headers[x_index] == "email"
+                    and re.match(email_regex, cell_value) is None
+                    or not cell_value
+                ):
+                    invalid_each[csv_headers[x_index]] = cell_value
                 each[csv_headers[x_index]] = cell_value
         if invalid_each:
             invalid_row.append(each)
@@ -93,11 +91,10 @@ class LeadListForm(forms.Form):
             data = import_document_validator(document)
             if data.get("error"):
                 raise forms.ValidationError(data.get("message"))
-            else:
-                self.validated_rows = data.get("validated_rows", [])
-                self.invalid_rows = data.get("invalid_rows", [])
-                if len(self.validated_rows) == 0:
-                    raise forms.ValidationError(
-                        "All the leads in the file are invalid."
-                    )
+            self.validated_rows = data.get("validated_rows", [])
+            self.invalid_rows = data.get("invalid_rows", [])
+            if len(self.validated_rows) == 0:
+                raise forms.ValidationError(
+                    "All the leads in the file are invalid."
+                )
         return document

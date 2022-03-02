@@ -61,25 +61,18 @@ class EventCreateSerializer(serializers.ModelSerializer):
                 .exists()
             ):
                 raise serializers.ValidationError("Event already exists with this name")
-        else:
-            if Event.objects.filter(name__iexact=name, org=self.org).exists():
-                raise serializers.ValidationError("Event already exists with this name")
+        elif Event.objects.filter(name__iexact=name, org=self.org).exists():
+            raise serializers.ValidationError("Event already exists with this name")
         return name
 
     def validate_event_type(self, event_type):
         """ This Validation Is For Keeping The Field Readonly While Editing or Updating"""
         event_type = self.initial_data.get("event_type")
-        if self.instance:
-            return self.instance.event_type
-        else:
-            return event_type
+        return self.instance.event_type if self.instance else event_type
 
     def validate_start_date(self, start_date):
         if start_date:
-            if self.instance:
-                return self.instance.start_date
-            else:
-                return start_date
+            return self.instance.start_date if self.instance else start_date
         else:
             raise serializers.ValidationError("Enter a valid Start date.")
 
@@ -89,11 +82,10 @@ class EventCreateSerializer(serializers.ModelSerializer):
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         event_type = self.initial_data.get("event_type")
-        if event_type == "Recurring":
-            if start_date == end_date:
-                raise serializers.ValidationError(
-                    "Start Date and End Date cannot be equal for recurring events"
-                )
+        if event_type == "Recurring" and start_date == end_date:
+            raise serializers.ValidationError(
+                "Start Date and End Date cannot be equal for recurring events"
+            )
         if start_date > end_date:
             raise serializers.ValidationError("End Date cannot be less than start date")
         return end_date

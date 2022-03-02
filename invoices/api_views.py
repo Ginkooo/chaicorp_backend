@@ -91,23 +91,18 @@ class InvoiceListView(APIView, LimitOffsetPagination):
                     total_amount__icontains=params.get("total_amount")
                 )
 
-        context = {}
-        search = False
-        if (
+        search = bool((
             params.get("invoice_title_or_number")
             or params.get("created_by")
             or params.get("assigned_users")
             or params.get("status")
             or params.get("total_amount")
-        ):
-            search = True
-
-        context["search"] = search
+        ))
         results_invoice = self.paginate_queryset(
             queryset.distinct(), self.request, view=self
         )
         invoices = InvoiceSerailizer(results_invoice, many=True).data
-        context["per_page"] = 10
+        context = {"search": search, "per_page": 10}
         context.update(
             {
                 "invoices_count": self.count,
@@ -268,18 +263,21 @@ class InvoiceDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        if self.request.user.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.user.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.user == invoice_obj.created_by)
                 or (self.request.user in invoice_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         serializer = InvoiceCreateSerializer(
             invoice_obj,
@@ -396,14 +394,17 @@ class InvoiceDetailView(APIView):
             return Response(
                 {"error": True, "errors": "User company doesnot match with header...."}
             )
-        if self.request.user.role != "ADMIN" and not self.request.user.is_superuser:
-            if self.request.user != self.object.created_by:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    }
-                )
+        if (
+            self.request.user.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and self.request.user != self.object.created_by
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                }
+            )
         if self.object.from_address_id:
             self.object.from_address.delete()
         if self.object.to_address_id:
@@ -424,29 +425,27 @@ class InvoiceDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        context = {}
-        context["invoice_obj"] = InvoiceSerailizer(self.invoice).data
-        if self.request.user.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        context = {"invoice_obj": InvoiceSerailizer(self.invoice).data}
+        if (
+            self.request.user.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.user == self.invoice.created_by)
                 or (self.request.user in self.invoice.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    }
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                }
+            )
 
-        comment_permission = (
-            True
-            if (
+        comment_permission = bool((
                 self.request.user == self.invoice.created_by
                 or self.request.user.is_superuser
                 or self.request.user.role == "ADMIN"
-            )
-            else False
-        )
+            ))
 
         if self.request.user.is_superuser or self.request.user.role == "ADMIN":
             users_mention = list(
@@ -508,24 +507,26 @@ class InvoiceDetailView(APIView):
             )
 
         comment_serializer = CommentSerializer(data=params)
-        if self.request.user.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.user.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.user == self.invoice_obj.created_by)
                 or (self.request.user in self.invoice_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-        if comment_serializer.is_valid():
-            if params.get("comment"):
-                comment_serializer.save(
-                    invoice_id=self.invoice_obj.id,
-                    commented_by_id=self.request.user.id,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        if comment_serializer.is_valid() and params.get("comment"):
+            comment_serializer.save(
+                invoice_id=self.invoice_obj.id,
+                commented_by_id=self.request.user.id,
+            )
 
         if self.request.FILES.get("invoice_attachment"):
             attachment = Attachments()
@@ -564,28 +565,27 @@ class InvoiceCommentView(APIView):
         params = request.query_params if len(request.data) == 0 else request.data
         obj = self.get_object(pk)
         if (
-            request.user.role == "ADMIN"
-            or request.user.is_superuser
-            or request.user == obj.commented_by
+            request.user.role != "ADMIN"
+            and not request.user.is_superuser
+            and request.user != obj.commented_by
         ):
-            serializer = CommentSerializer(obj, data=params)
-            if params.get("comment"):
-                if serializer.is_valid():
-                    serializer.save()
-                    return Response(
-                        {"error": False, "message": "Comment Submitted"},
-                        status=status.HTTP_200_OK,
-                    )
-                return Response(
-                    {"error": True, "errors": serializer.errors},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        else:
             return Response(
                 {
                     "error": True,
                     "errors": "You don't have permission to perform this action.",
                 }
+            )
+        serializer = CommentSerializer(obj, data=params)
+        if params.get("comment"):
+            if serializer.is_valid():
+                serializer.save()
+                return Response(
+                    {"error": False, "message": "Comment Submitted"},
+                    status=status.HTTP_200_OK,
+                )
+            return Response(
+                {"error": True, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
     @swagger_auto_schema(

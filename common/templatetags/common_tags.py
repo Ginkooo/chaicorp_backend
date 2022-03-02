@@ -601,18 +601,14 @@ def subtract(value, arg):
 
 @register.filter
 def delete_condition(user, task):
-    if user == task.created_by or user.role == "ADMIN":
-        return True
-    return False
+    return user == task.created_by or user.role == "ADMIN"
 
 
 @register.filter
 def view_edit_condition(user, task):
-    if (
+    return bool((
         user == task.created_by
         or user.role == "ADMIN"
         or user.has_sales_access
         or user in task.assigned_to.all()
-    ):
-        return True
-    return False
+    ))

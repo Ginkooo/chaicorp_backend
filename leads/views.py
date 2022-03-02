@@ -85,7 +85,6 @@ class LeadListView(APIView, LimitOffsetPagination):
             if params.get("email"):
                 queryset = queryset.filter(
                     email__icontains=params.get("email"))
-        context = {}
         queryset_open = queryset.exclude(status="closed")
         results_leads_open = self.paginate_queryset(
             queryset_open.distinct(), self.request, view=self
@@ -98,11 +97,13 @@ class LeadListView(APIView, LimitOffsetPagination):
                 offset = None
         else:
             offset = 0
-        context["per_page"] = 10
-        context["open_leads"] = {
-            "leads_count": self.count,
-            "open_leads": open_leads,
-            "offset": offset
+        context = {
+            "per_page": 10,
+            "open_leads": {
+                "leads_count": self.count,
+                "open_leads": open_leads,
+                "offset": offset,
+            },
         }
 
         queryset_close = queryset.filter(status="closed")
@@ -123,7 +124,7 @@ class LeadListView(APIView, LimitOffsetPagination):
             "close_leads": close_leads,
             "offset": offset
         }
-    
+
         contacts = Contact.objects.filter(org=self.request.org).values(
             "id",
             "first_name"
@@ -161,10 +162,7 @@ class LeadListView(APIView, LimitOffsetPagination):
                 tags = json.loads(params.get("tags"))
                 for t in tags:
                     tag = Tags.objects.filter(slug=t.lower())
-                    if tag.exists():
-                        tag = tag[0]
-                    else:
-                        tag = Tags.objects.create(name=t)
+                    tag = tag[0] if tag.exists() else Tags.objects.create(name=t)
                     lead_obj.tags.add(tag)
 
             if params.get("contacts"):
@@ -273,24 +271,25 @@ class LeadDetailView(APIView):
         ]
         if self.request.profile == self.lead_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and self.request.profile.id not in user_assgn_list
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         comments = Comment.objects.filter(lead=self.lead_obj).order_by("-id")
         attachments = Attachments.objects.filter(
             lead=self.lead_obj).order_by("-id")
         assigned_data = []
         for each in self.lead_obj.assigned_to.all():
-            assigned_dict = {}
-            assigned_dict["id"] = each.id
-            assigned_dict["name"] = each.email
+            assigned_dict = {"id": each.id, "name": each.email}
             assigned_data.append(assigned_dict)
 
         if self.request.user.is_superuser or self.request.profile.role == "ADMIN":
@@ -319,15 +318,18 @@ class LeadDetailView(APIView):
 
         if self.request.profile == self.lead_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and self.request.profile.id not in user_assgn_list
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         team_ids = [user.id for user in self.lead_obj.get_team_users]
         all_user_ids = [user.id for user in users]
         users_excluding_team_id = set(all_user_ids) - set(team_ids)
@@ -378,18 +380,21 @@ class LeadDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.profile == self.lead_obj.created_by)
                 or (self.request.profile in self.lead_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         comment_serializer = CommentSerializer(data=params)
         if comment_serializer.is_valid():
             if params.get("comment"):

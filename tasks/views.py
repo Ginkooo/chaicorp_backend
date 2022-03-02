@@ -156,15 +156,18 @@ class TaskDetailView(APIView):
         ]
         if self.request.profile == self.task_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and self.request.profile.id not in user_assgn_list
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         comments = Comment.objects.filter(task=self.task_obj).order_by("-id")
         attachments = Attachments.objects.filter(
@@ -195,15 +198,18 @@ class TaskDetailView(APIView):
 
         if self.request.profile == self.task_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and self.request.profile.id not in user_assgn_list
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         team_ids = [user.id for user in self.task_obj.get_team_users]
         all_user_ids = users.values_list("id", flat=True)
         users_excluding_team_id = set(all_user_ids) - set(team_ids)
@@ -244,25 +250,27 @@ class TaskDetailView(APIView):
         )
         context = {}
         self.task_obj = Task.objects.get(pk=pk)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == self.task_obj.created_by)
                 or (self.request.profile in self.task_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         comment_serializer = CommentSerializer(data=params)
-        if comment_serializer.is_valid():
-            if params.get("comment"):
-                comment_serializer.save(
-                    task_id=self.task_obj.id,
-                    commented_by_id=self.request.profile.id,
-                )
+        if comment_serializer.is_valid() and params.get("comment"):
+            comment_serializer.save(
+                task_id=self.task_obj.id,
+                commented_by_id=self.request.profile.id,
+            )
 
         if self.request.FILES.get("task_attachment"):
             attachment = Attachments()

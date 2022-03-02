@@ -39,35 +39,23 @@ class Address(models.Model):
     country = models.CharField(max_length=3, choices=COUNTRIES, blank=True, default="")
 
     def __str__(self):
-        return self.city if self.city else ""
+        return self.city or ""
 
     def get_complete_address(self):
         address = ""
         if self.address_line:
             address += self.address_line
         if self.street:
-            if address:
-                address += ", " + self.street
-            else:
-                address += self.street
+            address += f", {self.street}" if address else self.street
         if self.city:
-            if address:
-                address += ", " + self.city
-            else:
-                address += self.city
+            address += f", {self.city}" if address else self.city
         if self.state:
-            if address:
-                address += ", " + self.state
-            else:
-                address += self.state
+            address += f", {self.state}" if address else self.state
         if self.postcode:
-            if address:
-                address += ", " + self.postcode
-            else:
-                address += self.postcode
+            address += f", {self.postcode}" if address else self.postcode
         if self.country:
             if address:
-                address += ", " + self.get_country_display()
+                address += f", {self.get_country_display()}"
             else:
                 address += self.get_country_display()
         return address
@@ -110,12 +98,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_full_name(self):
         full_name = None
         if self.first_name or self.last_name:
-            full_name = self.first_name + " " + self.last_name
+            return f'{self.first_name} {self.last_name}'
         elif self.username:
-            full_name = self.username
+            return self.username
         else:
-            full_name = self.email
-        return full_name
+            return self.email
 
     @property
     def created_on_arrow(self):
@@ -253,10 +240,7 @@ class Comment_Files(models.Model):
     )
 
     def get_file_name(self):
-        if self.comment_file:
-            return self.comment_file.path.split("/")[-1]
-
-        return None
+        return self.comment_file.path.split("/")[-1] if self.comment_file else None
 
 
 class Attachments(models.Model):
@@ -353,9 +337,7 @@ class Attachments(models.Model):
         return ("file", "fa fa-file")
 
     def get_file_type_display(self):
-        if self.attachment:
-            return self.file_type()[1]
-        return None
+        return self.file_type()[1] if self.attachment else None
 
     @property
     def created_on_arrow(self):

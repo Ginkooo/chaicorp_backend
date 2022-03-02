@@ -60,11 +60,10 @@ class RegisterOrganizationSerializer(serializers.Serializer):
     org_name = serializers.CharField(max_length=100)
 
     def validate_password(self, password):
-        if password:
-            if len(password) < 4:
-                raise serializers.ValidationError(
-                    "Password must be at least 4 characters long!"
-                )
+        if password and len(password) < 4:
+            raise serializers.ValidationError(
+                "Password must be at least 4 characters long!"
+            )
         return password
 
     def validate_email(self, email):
@@ -292,16 +291,14 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         self.org = request_obj.org
 
     def validate_title(self, title):
-        if self.instance:
-            if (
-                Document.objects.filter(
-                    title__iexact=title, org=self.org)
-                .exclude(id=self.instance.id)
-                .exists()
-            ):
-                raise serializers.ValidationError(
-                    "Document with this Title already exists"
-                )
+        if self.instance and (
+            Document.objects.filter(title__iexact=title, org=self.org)
+            .exclude(id=self.instance.id)
+            .exists()
+        ):
+            raise serializers.ValidationError(
+                "Document with this Title already exists"
+            )
         if Document.objects.filter(title__iexact=title, org=self.org).exists():
             raise serializers.ValidationError(
                 "Document with this Title already exists"
@@ -345,7 +342,7 @@ class APISettingsSerializer(serializers.ModelSerializer):
             website.startswith("http://") or website.startswith("https://")
         ):
             raise serializers.ValidationError("Please provide valid schema")
-        if not len(find_urls(website)) > 0:
+        if len(find_urls(website)) <= 0:
             raise serializers.ValidationError(
                 "Please provide a valid URL with schema and without trailing slash - Example: http://google.com"
             )

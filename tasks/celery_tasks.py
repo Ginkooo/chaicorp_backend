@@ -17,17 +17,17 @@ def send_email(task_id, recipients, domain="demo.django-crm.io", protocol="http"
     task = Task.objects.filter(id=task_id).first()
     created_by = task.created_by
     for user in recipients:
-        recipients_list = []
-        user = User.objects.filter(id=user, is_active=True).first()
-        if user:
-            recipients_list.append(user.email)
+        if user := User.objects.filter(id=user, is_active=True).first():
+            recipients_list = [user.email]
             subject = " Assigned a task for you ."
-            context = {}
-            context["task_title"] = task.title
-            context["task_id"] = task.id
-            context["task_created_by"] = task.created_by
-            context["url"] = protocol + "://" + domain
-            context["user"] = user
+            context = {
+                "task_title": task.title,
+                "task_id": task.id,
+                "task_created_by": task.created_by,
+                "url": f'{protocol}://{domain}',
+                "user": user,
+            }
+
             html_content = render_to_string(
                 "tasks_email_template.html", context=context
             )

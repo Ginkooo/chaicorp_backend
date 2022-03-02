@@ -15,21 +15,20 @@ def send_email(invoice_id, recipients, domain="demo.django-crm.io", protocol="ht
     invoice = Invoice.objects.filter(id=invoice_id).first()
     created_by = invoice.created_by
     for user in recipients:
-        recipients_list = []
-        user = User.objects.filter(id=user, is_active=True).first()
-        if user:
-            recipients_list.append(user.email)
+        if user := User.objects.filter(id=user, is_active=True).first():
+            recipients_list = [user.email]
             subject = "Shared an invoice with you."
-            context = {}
-            context["invoice_title"] = invoice.invoice_title
-            context["invoice_id"] = invoice_id
-            context["invoice_created_by"] = invoice.created_by
-            context["url"] = (
-                protocol
-                + "://"
-                + domain
-                + reverse("invoices:invoice_details", args=(invoice.id,))
-            )
+            context = {
+                "invoice_title": invoice.invoice_title,
+                "invoice_id": invoice_id,
+                "invoice_created_by": invoice.created_by,
+                "url": (
+                    protocol
+                    + "://"
+                    + domain
+                    + reverse("invoices:invoice_details", args=(invoice.id,))
+                ),
+            }
 
             context["user"] = user
             html_content = render_to_string(
@@ -69,42 +68,32 @@ def send_email(invoice_id, recipients, domain="demo.django-crm.io", protocol="ht
 
 @app.task
 def send_invoice_email(invoice_id, domain="demo.django-crm.io", protocol="http"):
-    invoice = Invoice.objects.filter(id=invoice_id).first()
-    if invoice:
-        subject = "CRM Invoice : {0}".format(invoice.invoice_title)
-        recipients = [invoice.email]
-        context = {}
-        context["invoice"] = invoice
-        context["url"] = (
-            protocol
+    if not (invoice := Invoice.objects.filter(id=invoice_id).first()):
+        return
+    subject = "CRM Invoice : {0}".format(invoice.invoice_title)
+    recipients = [invoice.email]
+    context = {"invoice": invoice, "url": (protocol
             + "://"
-            + domain
-            + reverse("invoices:invoice_details", args=(invoice.id,))
-        )
-        html_content = render_to_string("invoice_detail_email.html", context=context)
-        msg = EmailMessage(subject=subject, body=html_content, to=recipients)
-        msg.content_subtype = "html"
-        msg.send()
+            + domain + reverse("invoices:invoice_details", args=(invoice.id,)))}
+    html_content = render_to_string("invoice_detail_email.html", context=context)
+    msg = EmailMessage(subject=subject, body=html_content, to=recipients)
+    msg.content_subtype = "html"
+    msg.send()
 
 
 @app.task
 def send_invoice_email_cancel(invoice_id, domain="demo.django-crm.io", protocol="http"):
-    invoice = Invoice.objects.filter(id=invoice_id).first()
-    if invoice:
-        subject = "CRM Invoice : {0}".format(invoice.invoice_title)
-        recipients = [invoice.email]
-        context = {}
-        context["invoice"] = invoice
-        context["url"] = (
-            protocol
+    if not (invoice := Invoice.objects.filter(id=invoice_id).first()):
+        return
+    subject = "CRM Invoice : {0}".format(invoice.invoice_title)
+    recipients = [invoice.email]
+    context = {"invoice": invoice, "url": (protocol
             + "://"
-            + domain
-            + reverse("invoices:invoice_details", args=(invoice.id,))
-        )
-        html_content = render_to_string("invoice_cancelled.html", context=context)
-        msg = EmailMessage(subject=subject, body=html_content, to=recipients)
-        msg.content_subtype = "html"
-        msg.send()
+            + domain + reverse("invoices:invoice_details", args=(invoice.id,)))}
+    html_content = render_to_string("invoice_cancelled.html", context=context)
+    msg = EmailMessage(subject=subject, body=html_content, to=recipients)
+    msg.content_subtype = "html"
+    msg.send()
 
 
 @app.task

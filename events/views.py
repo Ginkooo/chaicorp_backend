@@ -236,15 +236,18 @@ class EventDetailView(APIView):
         ]
         if self.request.profile == self.event_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and self.request.profile.id not in user_assgn_list
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         comments = Comment.objects.filter(event=self.event_obj).order_by("-id")
         attachments = Attachments.objects.filter(
@@ -272,15 +275,18 @@ class EventDetailView(APIView):
 
         if self.request.profile == self.event_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and self.request.profile.id not in user_assgn_list
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         team_ids = [user.id for user in self.event_obj.get_team_users]
         all_user_ids = profiles.values_list("id", flat=True)
         users_excluding_team_id = set(all_user_ids) - set(team_ids)
@@ -290,9 +296,10 @@ class EventDetailView(APIView):
         selected_recurring_days = Event.objects.filter(
             name=self.event_obj.name
         ).values_list("date_of_meeting", flat=True)
-        selected_recurring_days = set(
-            [day.strftime("%A") for day in selected_recurring_days]
-        )
+        selected_recurring_days = {
+            day.strftime("%A") for day in selected_recurring_days
+        }
+
         context.update(
             {
                 "event_obj": EventSerializer(self.event_obj).data,
@@ -341,25 +348,27 @@ class EventDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == self.event_obj.created_by)
                 or (self.request.profile in self.event_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         comment_serializer = CommentSerializer(data=params)
-        if comment_serializer.is_valid():
-            if params.get("comment"):
-                comment_serializer.save(
-                    event_id=self.event_obj.id,
-                    commented_by_id=self.request.profile.id,
-                )
+        if comment_serializer.is_valid() and params.get("comment"):
+            comment_serializer.save(
+                event_id=self.event_obj.id,
+                commented_by_id=self.request.profile.id,
+            )
 
         if self.request.FILES.get("event_attachment"):
             attachment = Attachments()

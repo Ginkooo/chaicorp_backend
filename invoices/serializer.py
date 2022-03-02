@@ -93,13 +93,12 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Invoice already exists with this invoice_title"
                 )
-        else:
-            if Invoice.objects.filter(
+        elif Invoice.objects.filter(
                 invoice_title__iexact=invoice_title, org=self.org
             ).exists():
-                raise serializers.ValidationError(
-                    "Invoice already exists with this invoice_title"
-                )
+            raise serializers.ValidationError(
+                "Invoice already exists with this invoice_title"
+            )
         return invoice_title
 
     class Meta:

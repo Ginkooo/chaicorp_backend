@@ -70,7 +70,7 @@ class EmailTestCase(UserCreation, TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_email_trash_get(self):
-        url = "/emails/email_trash_delete/" + str(self.email.pk) + "/"
+        url = f"/emails/email_trash_delete/{str(self.email.pk)}/"
         # print(url)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 302)
@@ -121,27 +121,27 @@ class EmailTestCase(UserCreation, TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_email_draft_delete(self):
-        url = "/emails/email_draft_delete/" + str(self.email.pk) + "/"
+        url = f"/emails/email_draft_delete/{str(self.email.pk)}/"
         response = self.client.get(url)
         self.assertEqual(response.status_code, 302)
 
     def test_email_delete(self):
-        url = "/emails/email_delete/" + str(self.email.pk) + "/"
+        url = f"/emails/email_delete/{str(self.email.pk)}/"
         response = self.client.get(url)
         self.assertEqual(response.status_code, 302)
 
     def test_email_view(self):
-        url = "/emails/email_view/" + str(self.email.pk) + "/"
+        url = f"/emails/email_view/{str(self.email.pk)}/"
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_email_sent_edit_get(self):
-        url = "/emails/email_sent_edit/" + str(self.email.pk) + "/"
+        url = f"/emails/email_sent_edit/{str(self.email.pk)}/"
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_email_sent_edit_post(self):
-        url = "/emails/email_sent_edit/" + str(self.email.pk) + "/"
+        url = f"/emails/email_sent_edit/{str(self.email.pk)}/"
         data = {
             "from_email": "john@doe.com",
             "to_email": "jane@doe.com",

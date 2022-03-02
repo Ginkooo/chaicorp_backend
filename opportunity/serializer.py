@@ -73,11 +73,10 @@ class OpportunityCreateSerializer(serializers.ModelSerializer):
                     "Opportunity already exists with this name"
                 )
 
-        else:
-            if Opportunity.objects.filter(name__iexact=name, org=self.org).exists():
-                raise serializers.ValidationError(
-                    "Opportunity already exists with this name"
-                )
+        elif Opportunity.objects.filter(name__iexact=name, org=self.org).exists():
+            raise serializers.ValidationError(
+                "Opportunity already exists with this name"
+            )
         return name
 
     class Meta:

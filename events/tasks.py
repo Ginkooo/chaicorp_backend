@@ -12,18 +12,20 @@ app = Celery("redis://")
 def send_email(event_id, recipients):
     event = Event.objects.filter(id=event_id).first()
     subject = " Invitation for an event."
-    context = {}
-    context["event"] = event.name
-    context["event_id"] = event_id
-    context["event_created_by"] = event.created_by
-    context["event_date_of_meeting"] = event.date_of_meeting
-    context["url"] = settings.DOMAIN_NAME
+    context = {
+        "event": event.name,
+        "event_id": event_id,
+        "event_created_by": event.created_by,
+        "event_date_of_meeting": event.date_of_meeting,
+        "url": settings.DOMAIN_NAME,
+    }
+
     # recipients = event.assigned_to.filter(is_active=True)
     for profile_id in recipients:
-        recipients_list = []
-        profile = Profile.objects.filter(id=profile_id, is_active=True).first()
-        if profile:
-            recipients_list.append(profile.user.email)
+        if profile := Profile.objects.filter(
+            id=profile_id, is_active=True
+        ).first():
+            recipients_list = [profile.user.email]
             event_members = event.assigned_to.filter(is_active=True)
 
             context["other_members"] = list(

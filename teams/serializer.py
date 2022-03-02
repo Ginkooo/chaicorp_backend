@@ -38,9 +38,8 @@ class TeamCreateSerializer(serializers.ModelSerializer):
                 .exists()
             ):
                 raise serializers.ValidationError("Team already exists with this name")
-        else:
-            if Teams.objects.filter(name__iexact=name).exists():
-                raise serializers.ValidationError("Team already exists with this name")
+        elif Teams.objects.filter(name__iexact=name).exists():
+            raise serializers.ValidationError("Team already exists with this name")
         return name
 
     class Meta:

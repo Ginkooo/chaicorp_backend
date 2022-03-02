@@ -74,7 +74,6 @@ class AccountsListView(APIView, LimitOffsetPagination):
                     tags__in=json.loads(params.get("tags"))
                 ).distinct()
 
-        context = {}
         queryset_open = queryset.filter(status="open")
         results_accounts_open = self.paginate_queryset(
             queryset_open.distinct(), self.request, view=self
@@ -88,10 +87,9 @@ class AccountsListView(APIView, LimitOffsetPagination):
             offset = 0
         accounts_open = AccountSerializer(
             results_accounts_open, many=True).data
-        context["per_page"] = 10
-        context["active_accounts"] = {
-            "offset": offset,
-            "open_accounts": accounts_open,
+        context = {
+            "per_page": 10,
+            "active_accounts": {"offset": offset, "open_accounts": accounts_open},
         }
 
         queryset_close = queryset.filter(status="close")
@@ -137,32 +135,28 @@ class AccountsListView(APIView, LimitOffsetPagination):
                 created_by=request.profile, org=request.org)
             if params.get("contacts"):
                 contacts_list = json.loads(params.get("contacts"))
-                contacts = Contact.objects.filter(
-                    id__in=contacts_list, org=request.org)
-                if contacts:
+                if contacts := Contact.objects.filter(
+                    id__in=contacts_list, org=request.org
+                ):
                     account_object.contacts.add(*contacts)
             if params.get("tags"):
                 tags = json.loads(params.get("tags"))
                 for tag in tags:
                     tag_obj = Tags.objects.filter(slug=tag.lower())
-                    if tag_obj.exists():
-                        tag_obj = tag_obj[0]
-                    else:
-                        tag_obj = Tags.objects.create(name=tag)
+                    tag_obj = tag_obj[0] if tag_obj.exists() else Tags.objects.create(name=tag)
                     account_object.tags.add(tag_obj)
             if params.get("teams"):
                 teams_list = json.loads(params.get("teams"))
-                teams = Teams.objects.filter(
+                if teams := Teams.objects.filter(
                     id__in=teams_list, org=request.org
-                )
-                if teams:
+                ):
                     account_object.teams.add(*teams)
                 if params.get("assigned_to"):
                     assigned_to_list = json.loads(
                         params.get("assigned_to"))
-                    profiles = Profile.objects.filter(
-                        id__in=assigned_to_list, org=request.org, is_active=True)
-                    if profiles:
+                    if profiles := Profile.objects.filter(
+                        id__in=assigned_to_list, org=request.org, is_active=True
+                    ):
                         account_object.assigned_to.add(*profiles)
 
             if self.request.FILES.get("account_attachment"):
@@ -215,18 +209,21 @@ class AccountDetailView(APIView):
         )
 
         if serializer.is_valid():
-            if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-                if not (
+            if (
+                self.request.profile.role != "ADMIN"
+                and not self.request.profile.is_admin
+                and not (
                     (self.request.profile == account_object.created_by)
                     or (self.request.profile in account_object.assigned_to.all())
-                ):
-                    return Response(
-                        {
-                            "error": True,
-                            "errors": "You do not have Permission to perform this action",
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
+                )
+            ):
+                return Response(
+                    {
+                        "error": True,
+                        "errors": "You do not have Permission to perform this action",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             account_object = serializer.save()
             previous_assigned_to_users = list(
                 account_object.assigned_to.all().values_list("id", flat=True)
@@ -235,9 +232,9 @@ class AccountDetailView(APIView):
             account_object.contacts.clear()
             if params.get("contacts"):
                 contacts_list = json.loads(params.get("contacts"))
-                contacts = Contact.objects.filter(
-                    id__in=contacts_list, org=request.org)
-                if contacts:
+                if contacts := Contact.objects.filter(
+                    id__in=contacts_list, org=request.org
+                ):
                     account_object.contacts.add(*contacts)
 
             account_object.tags.clear()
@@ -245,28 +242,24 @@ class AccountDetailView(APIView):
                 tags = json.loads(params.get("tags"))
                 for tag in tags:
                     tag_obj = Tags.objects.filter(slug=tag.lower())
-                    if tag_obj.exists():
-                        tag_obj = tag_obj[0]
-                    else:
-                        tag_obj = Tags.objects.create(name=tag)
+                    tag_obj = tag_obj[0] if tag_obj.exists() else Tags.objects.create(name=tag)
                     account_object.tags.add(tag_obj)
 
             account_object.teams.clear()
             if params.get("teams"):
                 teams_list = json.loads(params.get("teams"))
-                teams = Teams.objects.filter(
+                if teams := Teams.objects.filter(
                     id__in=teams_list, org=request.org
-                )
-                if teams:
+                ):
                     account_object.teams.add(*teams)
 
             account_object.assigned_to.clear()
             if params.get("assigned_to"):
                 assigned_to_list = json.loads(
                     params.get("assigned_to"))
-                profiles = Profile.objects.filter(
-                    id__in=assigned_to_list, org=request.org, is_active=True)
-                if profiles:
+                if profiles := Profile.objects.filter(
+                    id__in=assigned_to_list, org=request.org, is_active=True
+                ):
                     account_object.assigned_to.add(*profiles)
 
             if self.request.FILES.get("account_attachment"):
@@ -306,15 +299,18 @@ class AccountDetailView(APIView):
                  "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if self.request.profile != self.object.created_by:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and self.request.profile != self.object.created_by
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         self.object.delete()
         return Response(
             {"error": False, "message": "Account Deleted Successfully."},
@@ -331,29 +327,28 @@ class AccountDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        context = {}
-        context["account_obj"] = AccountSerializer(self.account).data
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        context = {"account_obj": AccountSerializer(self.account).data}
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == self.account.created_by)
                 or (self.request.profile in self.account.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        comment_permission = False
-        if (
+        comment_permission = bool((
             self.request.profile == self.account.created_by
             or self.request.profile.is_admin
             or self.request.profile.role == "ADMIN"
-        ):
-            comment_permission = True
-
+        ))
         if self.request.profile.is_admin or self.request.profile.role == "ADMIN":
             users_mention = list(Profile.objects.filter(
                 is_active=True, org=self.request.org).values("user__username"))
@@ -426,25 +421,27 @@ class AccountDetailView(APIView):
                 {"error": True, "errors": "User company does not match with header...."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == self.account_obj.created_by)
                 or (self.request.profile in self.account_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         comment_serializer = CommentSerializer(data=params)
-        if comment_serializer.is_valid():
-            if params.get("comment"):
-                comment_serializer.save(
-                    account_id=self.account_obj.id,
-                    commented_by=self.request.profile,
-                )
+        if comment_serializer.is_valid() and params.get("comment"):
+            comment_serializer.save(
+                account_id=self.account_obj.id,
+                commented_by=self.request.profile,
+            )
 
         if self.request.FILES.get("account_attachment"):
             attachment = Attachments()
@@ -581,18 +578,22 @@ class AccountCreateMailView(APIView):
             request_obj=request,  # account=account,
         )
 
-        data = {}
         if serializer.is_valid():
             email_obj = serializer.save(from_account=account)
-            if scheduled_later not in ["", None, False, "false"]:
-                if scheduled_date_time in ["", None]:
-                    return Response(
-                        {"error": True, "errors": serializer.errors},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+            if scheduled_later not in [
+                "",
+                None,
+                False,
+                "false",
+            ] and scheduled_date_time in ["", None]:
+                return Response(
+                    {"error": True, "errors": serializer.errors},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             if params.get("recipients"):
                 contacts = json.loads(params.get("recipients"))
+                data = {}
                 for contact in contacts:
                     obj_contact = Contact.objects.filter(
                         id=contact, org=request.org

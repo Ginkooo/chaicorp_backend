@@ -56,14 +56,12 @@ class GetTeamsAndUsersView(APIView):
         tags=["Users"], manual_parameters=swagger_params.organization_params
     )
     def get(self, request, *args, **kwargs):
-        data = {}
         teams = Teams.objects.filter(org=request.org).order_by('-id')
         teams_data = TeamsSerializer(teams, many=True).data
         profiles = Profile.objects.filter(
             is_active=True, org=request.org).order_by('user__email')
         profiles_data = ProfileSerializer(profiles, many=True).data
-        data["teams"] = teams_data
-        data["profiles"] = profiles_data
+        data = {"teams": teams_data, "profiles": profiles_data}
         return Response(data)
 
 
@@ -72,8 +70,7 @@ class UserDetailView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get_object(self, pk):
-        profile = get_object_or_404(Profile, pk=pk)
-        return profile
+        return get_object_or_404(Profile, pk=pk)
 
     @swagger_auto_schema(
         tags=["Users"], manual_parameters=swagger_params.organization_params
@@ -96,8 +93,7 @@ class UserDetailView(APIView):
             )
         assigned_data = Profile.objects.filter(
             org=request.org, is_active=True).values('id', 'user__first_name')
-        context = {}
-        context["profile_obj"] = ProfileSerializer(profile_obj).data
+        context = {"profile_obj": ProfileSerializer(profile_obj).data}
         opportunity_list = Opportunity.objects.filter(assigned_to=profile_obj)
         context["opportunity_list"] = OpportunitySerializer(
             opportunity_list, many=True
@@ -259,8 +255,7 @@ class ApiHomeView(APIView):
                 Q(assigned_to__id__in=self.request.profile)
                 | Q(created_by=self.request.profile)
             )
-        context = {}
-        context["accounts_count"] = accounts.count()
+        context = {"accounts_count": accounts.count()}
         context["contacts_count"] = contacts.count()
         context["leads_count"] = leads.count()
         context["opportunities_count"] = opportunities.count()
@@ -372,8 +367,7 @@ class ProfileView(APIView):
         tags=["Profile"], manual_parameters=swagger_params.organization_params
     )
     def get(self, request, format=None):
-        context = {}
-        context["user_obj"] = ProfileSerializer(request.profile).data
+        context = {"user_obj": ProfileSerializer(request.profile).data}
         return Response(context, status=status.HTTP_200_OK)
 
 
@@ -391,53 +385,52 @@ class UsersListView(APIView, LimitOffsetPagination):
                 {"error": True, "errors": "Permission Denied"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        else:
-            params = request.query_params if len(
-                request.data) == 0 else request.data
-            if params:
-                user_serializer = CreateUserSerializer(
-                    data=params, org=request.org
+        params = request.query_params if len(
+            request.data) == 0 else request.data
+        if params:
+            user_serializer = CreateUserSerializer(
+                data=params, org=request.org
+            )
+            address_serializer = BillingAddressSerializer(data=params)
+            profile_serializer = CreateProfileSerializer(data=params)
+            data = {}
+            if not user_serializer.is_valid():
+                data["user_errors"] = dict(user_serializer.errors)
+            if not profile_serializer.is_valid():
+                data['profile_errors'] = profile_serializer.errors
+            if not address_serializer.is_valid():
+                data["address_errors"] = (address_serializer.errors,)
+            if data:
+                return Response(
+                    {"error": True, "errors": data},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-                address_serializer = BillingAddressSerializer(data=params)
-                profile_serializer = CreateProfileSerializer(data=params)
-                data = {}
-                if not user_serializer.is_valid():
-                    data["user_errors"] = dict(user_serializer.errors)
-                if not profile_serializer.is_valid():
-                    data['profile_errors'] = profile_serializer.errors
-                if not address_serializer.is_valid():
-                    data["address_errors"] = (address_serializer.errors,)
-                if data:
-                    return Response(
-                        {"error": True, "errors": data},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                if user_serializer.is_valid():
-                    address_obj = address_serializer.save()
-                    user = user_serializer.save(
-                        is_active=False,
-                    )
-                    user.username = user.first_name
+            if user_serializer.is_valid():
+                address_obj = address_serializer.save()
+                user = user_serializer.save(
+                    is_active=False,
+                )
+                user.username = user.first_name
+                user.save()
+                if params.get("password"):
+                    user.set_password(params.get("password"))
                     user.save()
-                    if params.get("password"):
-                        user.set_password(params.get("password"))
-                        user.save()
-                    profile = Profile.objects.create(user=user,
-                                                     date_of_joining=timezone.now(),
-                                                     role=params.get(
-                                                         'role'),
-                                                     address=address_obj,
-                                                     org=request.org,
-                                                     )
+                profile = Profile.objects.create(user=user,
+                                                 date_of_joining=timezone.now(),
+                                                 role=params.get(
+                                                     'role'),
+                                                 address=address_obj,
+                                                 org=request.org,
+                                                 )
 
-                    send_email_to_new_user.delay(
-                        profile.id,
-                        request.org.id,
-                    )
-                    return Response(
-                        {"error": False, "message": "User Created Successfully"},
-                        status=status.HTTP_201_CREATED,
-                    )
+                send_email_to_new_user.delay(
+                    profile.id,
+                    request.org.id,
+                )
+                return Response(
+                    {"error": False, "message": "User Created Successfully"},
+                    status=status.HTTP_201_CREATED,
+                )
 
     @swagger_auto_schema(
         tags=["Users"], manual_parameters=swagger_params.user_list_params
@@ -463,7 +456,6 @@ class UsersListView(APIView, LimitOffsetPagination):
             if params.get("status"):
                 queryset = queryset.filter(is_active=params.get("status"))
 
-        context = {}
         queryset_active_users = queryset.filter(is_active=True)
         results_active_users = self.paginate_queryset(
             queryset_active_users.distinct(), self.request, view=self
@@ -477,10 +469,12 @@ class UsersListView(APIView, LimitOffsetPagination):
                 offset = None
         else:
             offset = 0
-        context["active_users"] = {
-            "active_users_count": self.count,
-            "active_users": active_users,
-            "offset": offset
+        context = {
+            "active_users": {
+                "active_users_count": self.count,
+                "active_users": active_users,
+                "offset": offset,
+            }
         }
 
         queryset_inactive_users = queryset.filter(is_active=False)
@@ -523,23 +517,21 @@ class DocumentListView(APIView, LimitOffsetPagination):
             org=self.request.org).order_by('-id')
         if self.request.user.is_superuser or self.request.profile.role == "ADMIN":
             queryset = queryset
+        elif self.request.profile.documents():
+            doc_ids = self.request.profile.documents().values_list("id", flat=True)
+            shared_ids = queryset.filter(
+                Q(status="active") & Q(
+                    shared_to__id__in=[self.request.profile.id])
+            ).values_list("id", flat=True)
+            queryset = queryset.filter(
+                Q(id__in=doc_ids) | Q(id__in=shared_ids))
         else:
-            if self.request.profile.documents():
-                doc_ids = self.request.profile.documents().values_list("id", flat=True)
-                shared_ids = queryset.filter(
-                    Q(status="active") & Q(
-                        shared_to__id__in=[self.request.profile.id])
-                ).values_list("id", flat=True)
-                queryset = queryset.filter(
-                    Q(id__in=doc_ids) | Q(id__in=shared_ids))
-            else:
-                queryset = queryset.filter(
-                    Q(status="active") & Q(
-                        shared_to__id__in=[self.request.profile.id])
-                )
+            queryset = queryset.filter(
+                Q(status="active") & Q(
+                    shared_to__id__in=[self.request.profile.id])
+            )
 
-        request_post = params
-        if request_post:
+        if request_post := params:
             if request_post.get("title"):
                 queryset = queryset.filter(
                     title__icontains=request_post.get("title"))
@@ -551,7 +543,6 @@ class DocumentListView(APIView, LimitOffsetPagination):
                     shared_to__id__in=json.loads(request_post.get("shared_to"))
                 )
 
-        context = {}
         profile_list = Profile.objects.filter(
             is_active=True, org=self.request.org)
         if self.request.profile.role == "ADMIN" or self.request.profile.is_admin:
@@ -559,15 +550,11 @@ class DocumentListView(APIView, LimitOffsetPagination):
         else:
             profiles = profile_list.filter(
                 role="ADMIN").order_by("user__email")
-        search = False
-        if (
+        search = bool((
             params.get("document_file")
             or params.get("status")
             or params.get("shared_to")
-        ):
-            search = True
-        context["search"] = search
-
+        ))
         queryset_documents_active = queryset.filter(status="active")
         results_documents_active = self.paginate_queryset(
             queryset_documents_active.distinct(), self.request, view=self
@@ -581,10 +568,13 @@ class DocumentListView(APIView, LimitOffsetPagination):
                 offset = None
         else:
             offset = 0
-        context["documents_active"] = {
-            "documents_active_count": self.count,
-            "documents_active": documents_active,
-            "offset": offset
+        context = {
+            "search": search,
+            "documents_active": {
+                "documents_active_count": self.count,
+                "documents_active": documents_active,
+                "offset": offset,
+            },
         }
 
         queryset_documents_inactive = queryset.filter(status="inactive")
@@ -633,15 +623,15 @@ class DocumentListView(APIView, LimitOffsetPagination):
             )
             if params.get("shared_to"):
                 assinged_to_list = json.loads(params.get("shared_to"))
-                profiles = Profile.objects.filter(
-                    id__in=assinged_to_list, org=request.org, is_active=True)
-                if profiles:
+                if profiles := Profile.objects.filter(
+                    id__in=assinged_to_list, org=request.org, is_active=True
+                ):
                     doc.shared_to.add(*profiles)
             if params.get("teams"):
                 teams_list = json.loads(params.get("teams"))
-                teams = Teams.objects.filter(
-                    id__in=teams_list, org=request.org)
-                if teams:
+                if teams := Teams.objects.filter(
+                    id__in=teams_list, org=request.org
+                ):
                     doc.teams.add(*teams)
 
             return Response(
@@ -675,18 +665,21 @@ class DocumentDetailView(APIView):
             return Response(
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN)
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.profile == self.object.created_by)
                 or (self.request.profile in self.object.shared_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         profile_list = Profile.objects.filter(org=self.request.org)
         if request.profile.role == "ADMIN" or request.user.is_superuser:
             profiles = profile_list.order_by("user__email")
@@ -719,17 +712,18 @@ class DocumentDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if (
-                self.request.profile != document.created_by
-            ):  # or (self.request.profile not in document.shared_to.all()):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and (self.request.profile != document.created_by)
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         document.delete()
         return Response(
             {"error": False, "message": "Document deleted Successfully"},
@@ -753,18 +747,21 @@ class DocumentDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.profile == self.object.created_by)
                 or (self.request.profile in self.object.shared_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = DocumentCreateSerializer(
             data=params, instance=self.object, request_obj=request
         )
@@ -777,17 +774,17 @@ class DocumentDetailView(APIView):
             doc.shared_to.clear()
             if params.get("shared_to"):
                 assinged_to_list = json.loads(params.get("shared_to"))
-                profiles = Profile.objects.filter(
-                    id__in=assinged_to_list, org=request.org, is_active=True)
-                if profiles:
+                if profiles := Profile.objects.filter(
+                    id__in=assinged_to_list, org=request.org, is_active=True
+                ):
                     doc.shared_to.add(*profiles)
 
             doc.teams.clear()
             if params.get("teams"):
                 teams_list = json.loads(params.get("teams"))
-                teams = Teams.objects.filter(
-                    id__in=teams_list, org=request.org)
-                if teams:
+                if teams := Teams.objects.filter(
+                    id__in=teams_list, org=request.org
+                ):
                     doc.teams.add(*teams)
             return Response(
                 {"error": False, "message": "Document Updated Successfully"},
@@ -837,32 +834,29 @@ class ResetPasswordView(APIView):
         try:
             uid = force_text(urlsafe_base64_decode(uid))
             user_obj = User.objects.get(pk=uid)
-            if not user_obj.password:
-                if not user_obj.is_active:
-                    user_obj.is_active = True
-                    user_obj.save()
+            if not user_obj.password and not user_obj.is_active:
+                user_obj.is_active = True
+                user_obj.save()
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             user_obj = None
-        if user_obj is not None:
-            password1 = params.get("new_password1")
-            password2 = params.get("new_password2")
-            if password1 != password2:
-                return Response(
-                    {"error": True, "errors": "The two password fields didn't match."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            else:
-                user_obj.set_password(password1)
-                user_obj.save()
-                return Response(
-                    {"error": False,
-                        "message": "Password Updated Successfully. Please login"},
-                    status=status.HTTP_200_OK
-                )
-        else:
+        if user_obj is None:
             return Response(
                 {"error": True, "errors": "Invalid Link"}
             )
+        password1 = params.get("new_password1")
+        password2 = params.get("new_password2")
+        if password1 != password2:
+            return Response(
+                {"error": True, "errors": "The two password fields didn't match."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user_obj.set_password(password1)
+        user_obj.save()
+        return Response(
+            {"error": False,
+                "message": "Password Updated Successfully. Please login"},
+            status=status.HTTP_200_OK
+        )
 
 
 class UserStatusView(APIView):
@@ -899,11 +893,10 @@ class UserStatusView(APIView):
                 )
             profile.save()
 
-        context = {}
         active_profiles = profiles.filter(is_active=True)
         inactive_profiles = profiles.filter(is_active=False)
-        context["active_profiles"] = ProfileSerializer(
-            active_profiles, many=True).data
+        context = {"active_profiles": ProfileSerializer(
+            active_profiles, many=True).data}
         context["inactive_profiles"] = ProfileSerializer(
             inactive_profiles, many=True).data
         return Response(context)
@@ -1021,8 +1014,7 @@ class DomainDetailView(APIView):
         tags=["Settings"], manual_parameters=swagger_params.organization_params
     )
     def delete(self, request, pk, **kwargs):
-        api_setting = self.get_object(pk)
-        if api_setting:
+        if api_setting := self.get_object(pk):
             api_setting.delete()
         return Response(
             {"error": False, "message": "API setting deleted sucessfully"},

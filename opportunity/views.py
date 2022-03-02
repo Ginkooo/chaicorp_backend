@@ -142,10 +142,7 @@ class OpportunityListView(APIView, LimitOffsetPagination):
                 tags = json.loads(params.get("tags"))
                 for tag in tags:
                     obj_tag = Tags.objects.filter(slug=tag.lower())
-                    if obj_tag.exists():
-                        obj_tag = obj_tag[0]
-                    else:
-                        obj_tag = Tags.objects.create(name=tag)
+                    obj_tag = obj_tag[0] if obj_tag.exists() else Tags.objects.create(name=tag)
                     opportunity_obj.tags.add(obj_tag)
 
             if params.get("stage"):
@@ -217,18 +214,21 @@ class OpportunityDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.profile == opportunity_object.created_by)
                 or (self.request.profile in opportunity_object.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         serializer = OpportunityCreateSerializer(
             opportunity_object,
@@ -256,10 +256,7 @@ class OpportunityDetailView(APIView):
                 tags = json.loads(params.get("tags"))
                 for tag in tags:
                     obj_tag = Tags.objects.filter(slug=tag.lower())
-                    if obj_tag.exists():
-                        obj_tag = obj_tag[0]
-                    else:
-                        obj_tag = Tags.objects.create(name=tag)
+                    obj_tag = obj_tag[0] if obj_tag.exists() else Tags.objects.create(name=tag)
                     opportunity_object.tags.add(obj_tag)
 
             if params.get("stage"):
@@ -321,15 +318,18 @@ class OpportunityDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if self.request.profile != self.object.created_by:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and self.request.profile != self.object.created_by
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         self.object.delete()
         return Response(
             {"error": False, "message": "Opportunity Deleted Successfully."},
@@ -341,36 +341,34 @@ class OpportunityDetailView(APIView):
     )
     def get(self, request, pk, format=None):
         self.opportunity = self.get_object(pk=pk)
-        context = {}
-        context["opportunity_obj"] = OpportunitySerializer(
-            self.opportunity).data
+        context = {"opportunity_obj": OpportunitySerializer(
+            self.opportunity).data}
         if self.opportunity.org != request.org:
             return Response(
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.profile == self.opportunity.created_by)
                 or (self.request.profile in self.opportunity.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        comment_permission = False
-
-        if (
+        comment_permission = bool((
             self.request.profile == self.opportunity.created_by
             or self.request.user.is_superuser
             or self.request.profile.role == "ADMIN"
-        ):
-            comment_permission = True
-
+        ))
         if self.request.user.is_superuser or self.request.profile.role == "ADMIN":
             users_mention = list(
                 Profile.objects.filter(
@@ -430,18 +428,21 @@ class OpportunityDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         comment_serializer = CommentSerializer(data=params)
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.user.is_superuser
+            and not (
                 (self.request.profile == self.opportunity_obj.created_by)
                 or (self.request.profile in self.opportunity_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if comment_serializer.is_valid():
             if params.get("comment"):
                 comment_serializer.save(

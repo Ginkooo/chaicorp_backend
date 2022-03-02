@@ -26,8 +26,7 @@ class GetProfileAndOrg(object):
     def process_request(self, request):
         if request.headers.get("org"):
             org_id = request.headers.get("org")
-            org = Org.objects.filter(id=org_id).first()
-            if org:
+            if org := Org.objects.filter(id=org_id).first():
                 request.org = org
                 set_profile_request(request, org)
             else:

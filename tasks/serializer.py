@@ -52,9 +52,8 @@ class TaskCreateSerializer(serializers.ModelSerializer):
                 .exists()
             ):
                 raise serializers.ValidationError("Task already exists with this title")
-        else:
-            if Task.objects.filter(title__iexact=title, org=self.org).exists():
-                raise serializers.ValidationError("Task already exists with this title")
+        elif Task.objects.filter(title__iexact=title, org=self.org).exists():
+            raise serializers.ValidationError("Task already exists with this title")
         return title
 
     class Meta:

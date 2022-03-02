@@ -17,15 +17,17 @@ def send_email_to_assigned_user(
     contact = Contact.objects.get(id=contact_id)
     created_by = contact.created_by
     for profile_id in recipients:
-        recipients_list = []
-        profile = Profile.objects.filter(id=profile_id, is_active=True).first()
-        if profile:
-            recipients_list.append(profile.user.email)
-            context = {}
-            context["url"] = settings.DOMAIN_NAME
-            context["user"] = profile.user
-            context["contact"] = contact
-            context["created_by"] = created_by
+        if profile := Profile.objects.filter(
+            id=profile_id, is_active=True
+        ).first():
+            recipients_list = [profile.user.email]
+            context = {
+                "url": settings.DOMAIN_NAME,
+                "user": profile.user,
+                "contact": contact,
+                "created_by": created_by,
+            }
+
             subject = "Assigned a contact for you."
             html_content = render_to_string(
                 "assigned_to/contact_assigned.html", context=context

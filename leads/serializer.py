@@ -83,12 +83,11 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         self.fields["title"].required = True
         self.org = request_obj.org
 
-        if self.instance:
-            if self.instance.created_from_site:
-                prev_choices = self.fields["source"]._get_choices()
-                prev_choices = prev_choices + \
-                    [("micropyramid", "Micropyramid")]
-                self.fields["source"]._set_choices(prev_choices)
+        if self.instance and self.instance.created_from_site:
+            prev_choices = self.fields["source"]._get_choices()
+            prev_choices = prev_choices + \
+                [("micropyramid", "Micropyramid")]
+            self.fields["source"]._set_choices(prev_choices)
 
     def validate_account_name(self, account_name):
         if self.instance:
@@ -103,14 +102,13 @@ class LeadCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Account already exists with this name"
                 )
-        else:
-            if Account.objects.filter(
+        elif Account.objects.filter(
                 name__iexact=account_name,
                 org=self.org
             ).exists():
-                raise serializers.ValidationError(
-                    "Account already exists with this name"
-                )
+            raise serializers.ValidationError(
+                "Account already exists with this name"
+            )
         return account_name
 
     def validate_title(self, title):
@@ -125,10 +123,9 @@ class LeadCreateSerializer(serializers.ModelSerializer):
             ):
                 raise serializers.ValidationError(
                     "Lead already exists with this title")
-        else:
-            if Lead.objects.filter(title__iexact=title, org=self.org).exists():
-                raise serializers.ValidationError(
-                    "Lead already exists with this title")
+        elif Lead.objects.filter(title__iexact=title, org=self.org).exists():
+            raise serializers.ValidationError(
+                "Lead already exists with this title")
         return title
 
     class Meta:

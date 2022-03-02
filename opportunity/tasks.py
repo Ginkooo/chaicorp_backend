@@ -16,15 +16,15 @@ def send_email_to_assigned_user(
     opportunity = Opportunity.objects.get(id=opportunity_id)
     created_by = opportunity.created_by
     for user in recipients:
-        recipients_list = []
-        profile = Profile.objects.filter(id=user, is_active=True).first()
-        if profile:
-            recipients_list.append(profile.user.email)
-            context = {}
-            context["url"] = settings.DOMAIN_NAME
-            context["user"] = profile.user
-            context["opportunity"] = opportunity
-            context["created_by"] = created_by
+        if profile := Profile.objects.filter(id=user, is_active=True).first():
+            recipients_list = [profile.user.email]
+            context = {
+                "url": settings.DOMAIN_NAME,
+                "user": profile.user,
+                "opportunity": opportunity,
+                "created_by": created_by,
+            }
+
             subject = "Assigned an opportunity for you."
             html_content = render_to_string(
                 "assigned_to/opportunity_assigned.html", context=context

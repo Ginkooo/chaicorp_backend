@@ -194,18 +194,21 @@ class ContactDetailView(APIView):
             )
 
         if contact_serializer.is_valid():
-            if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-                if not (
+            if (
+                self.request.profile.role != "ADMIN"
+                and not self.request.profile.is_admin
+                and not (
                     (self.request.profile == contact_obj.created_by)
                     or (self.request.profile in contact_obj.assigned_to.all())
-                ):
-                    return Response(
-                        {
-                            "error": True,
-                            "errors": "You do not have Permission to perform this action",
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
+                )
+            ):
+                return Response(
+                    {
+                        "error": True,
+                        "errors": "You do not have Permission to perform this action",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
             address_obj = address_serializer.save()
             contact_obj = contact_serializer.save(
@@ -259,9 +262,8 @@ class ContactDetailView(APIView):
         tags=["contacts"], manual_parameters=swagger_params.organization_params
     )
     def get(self, request, pk, format=None):
-        context = {}
         contact_obj = self.get_object(pk)
-        context["contact_obj"] = ContactSerializer(contact_obj).data
+        context = {"contact_obj": ContactSerializer(contact_obj).data}
         user_assgn_list = [
             assigned_to.id for assigned_to in contact_obj.assigned_to.all()
         ]
@@ -276,20 +278,21 @@ class ContactDetailView(APIView):
             user_assgn_list.append(self.request.profile.id)
         if self.request.profile == contact_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and self.request.profile.id not in user_assgn_list
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         assigned_data = []
         for each in contact_obj.assigned_to.all():
-            assigned_dict = {}
-            assigned_dict["id"] = each.id
-            assigned_dict["name"] = each.email
+            assigned_dict = {"id": each.id, "name": each.email}
             assigned_data.append(assigned_dict)
 
         if self.request.profile.is_admin or self.request.profile.role == "ADMIN":
@@ -366,26 +369,28 @@ class ContactDetailView(APIView):
         )
         context = {}
         self.contact_obj = Contact.objects.get(pk=pk)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == self.contact_obj.created_by)
                 or (self.request.profile in self.contact_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         comment_serializer = CommentSerializer(data=params)
-        if comment_serializer.is_valid():
-            if params.get("comment"):
-                comment_serializer.save(
-                    contact_id=self.contact_obj.id,
-                    commented_by_id=self.request.profile.id,
-                    org=request.org
-                )
+        if comment_serializer.is_valid() and params.get("comment"):
+            comment_serializer.save(
+                contact_id=self.contact_obj.id,
+                commented_by_id=self.request.profile.id,
+                org=request.org
+            )
 
         if self.request.FILES.get("contact_attachment"):
             attachment = Attachments()

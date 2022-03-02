@@ -94,40 +94,28 @@ class Invoice(models.Model):
             prev_invoice_number += 1
             return prev_invoice_number
         date = datetime.datetime.now().strftime("%d%m%Y")
-        return int(date + "0001")
+        return int(f'{date}0001')
 
     def formatted_total_amount(self):
-        return self.currency + " " + str(self.total_amount)
+        return f'{self.currency} {str(self.total_amount)}'
 
     def formatted_rate(self):
-        return str(self.rate) + " " + self.currency
+        return f'{str(self.rate)} {self.currency}'
 
     def formatted_total_quantity(self):
-        return str(self.quantity) + " " + "Hours"
+        return f'{str(self.quantity)} Hours'
 
     def is_draft(self):
-        if self.status == "Draft":
-            return True
-        else:
-            return False
+        return self.status == "Draft"
 
     def is_sent(self):
-        if self.status == "Sent" and self.is_email_sent == False:
-            return True
-        else:
-            return False
+        return self.status == "Sent" and self.is_email_sent == False
 
     def is_resent(self):
-        if self.status == "Sent" and self.is_email_sent == True:
-            return True
-        else:
-            return False
+        return self.status == "Sent" and self.is_email_sent == True
 
     def is_paid_or_cancelled(self):
-        if self.status in ["Paid", "Cancelled"]:
-            return True
-        else:
-            return False
+        return self.status in ["Paid", "Cancelled"]
 
     @property
     def created_on_arrow(self):
@@ -229,13 +217,13 @@ class InvoiceHistory(models.Model):
         ordering = ("created_on",)
 
     def formatted_total_amount(self):
-        return self.currency + " " + str(self.total_amount)
+        return f'{self.currency} {str(self.total_amount)}'
 
     def formatted_rate(self):
-        return str(self.rate) + " " + self.currency
+        return f'{str(self.rate)} {self.currency}'
 
     def formatted_total_quantity(self):
-        return str(self.quantity) + " " + "Hours"
+        return f'{str(self.quantity)} Hours'
 
     @property
     def created_on_arrow(self):

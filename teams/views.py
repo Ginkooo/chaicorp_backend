@@ -96,8 +96,9 @@ class TeamsListView(APIView, LimitOffsetPagination):
 
             if params.get("assign_users"):
                 assinged_to_list = json.loads(params.get("assign_users"))
-                profiles = Profile.objects.filter(id__in=assinged_to_list, org=request.org)
-                if profiles:
+                if profiles := Profile.objects.filter(
+                    id__in=assinged_to_list, org=request.org
+                ):
                     team_obj.users.add(*profiles)
             return Response(
                 {"error": False, "message": "Team Created Successfully"},
@@ -130,8 +131,7 @@ class TeamsDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         self.team_obj = self.get_object(pk)
-        context = {}
-        context["team"] = TeamsSerializer(self.team_obj).data
+        context = {"team": TeamsSerializer(self.team_obj).data}
         return Response(context)
 
     @swagger_auto_schema(
@@ -163,14 +163,13 @@ class TeamsDetailView(APIView):
             team_obj.users.clear()
             if params.get("assign_users"):
                 assinged_to_list = json.loads(params.get("assign_users"))
-                profiles = Profile.objects.filter(id__in=assinged_to_list, org=request.org)
-                if profiles:
+                if profiles := Profile.objects.filter(
+                    id__in=assinged_to_list, org=request.org
+                ):
                     team_obj.users.add(*profiles)
             update_team_users.delay(pk)
             latest_users = team_obj.get_users()
-            for user in actual_users:
-                if user not in latest_users:
-                    removed_users.append(user)
+            removed_users.extend(user for user in actual_users if user not in latest_users)
             remove_users.delay(removed_users, pk)
             return Response(
                 {"error": False, "message": "Team Updated Successfully"},

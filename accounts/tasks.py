@@ -16,44 +16,46 @@ app = Celery("redis://")
 
 @app.task
 def send_email(email_obj_id):
-    email_obj = Email.objects.filter(id=email_obj_id).first()
-    if email_obj:
-        from_email = email_obj.from_email
-        contacts = email_obj.recipients.all()
-        for contact_obj in contacts:
-            if not EmailLog.objects.filter(
+    if not (email_obj := Email.objects.filter(id=email_obj_id).first()):
+        return
+    from_email = email_obj.from_email
+    contacts = email_obj.recipients.all()
+    for contact_obj in contacts:
+        if not EmailLog.objects.filter(
                 email=email_obj, contact=contact_obj, is_sent=True
             ).exists():
-                html = email_obj.message_body
-                context_data = {
-                    "email": contact_obj.primary_email if contact_obj.primary_email else "",
-                    "name": contact_obj.first_name
-                    if contact_obj.first_name
-                    else "" + " " + contact_obj.last_name
+            html = email_obj.message_body
+            context_data = {
+                "email": contact_obj.primary_email or "",
+                "name": contact_obj.first_name
+                or (
+                    "" + " " + contact_obj.last_name
                     if contact_obj.last_name
-                    else "",
-                }
-                try:
-                    html_content = Template(html).render(Context(context_data))
-                    subject = email_obj.message_subject
-                    msg = EmailMessage(
-                        subject,
-                        html_content,
-                        from_email=from_email,
-                        to=[
-                            contact_obj.primary_email,
-                        ],
+                    else ""
+                ),
+            }
+
+            try:
+                html_content = Template(html).render(Context(context_data))
+                subject = email_obj.message_subject
+                msg = EmailMessage(
+                    subject,
+                    html_content,
+                    from_email=from_email,
+                    to=[
+                        contact_obj.primary_email,
+                    ],
+                )
+                msg.content_subtype = "html"
+                res = msg.send()
+                if res:
+                    email_obj.rendered_message_body = html_content
+                    email_obj.save()
+                    EmailLog.objects.create(
+                        email=email_obj, contact=contact_obj, is_sent=True
                     )
-                    msg.content_subtype = "html"
-                    res = msg.send()
-                    if res:
-                        email_obj.rendered_message_body = html_content
-                        email_obj.save()
-                        EmailLog.objects.create(
-                            email=email_obj, contact=contact_obj, is_sent=True
-                        )
-                except Exception as e:
-                    print(e)
+            except Exception as e:
+                print(e)
 
 
 @app.task
@@ -65,15 +67,17 @@ def send_email_to_assigned_user(
     created_by = account.created_by
 
     for profile_id in recipients:
-        recipients_list = []
-        profile = Profile.objects.filter(id=profile_id, is_active=True).first()
-        if profile:
-            recipients_list.append(profile.user.email)
-            context = {}
-            context["url"] = settings.DOMAIN_NAME
-            context["user"] = profile.user
-            context["account"] = account
-            context["created_by"] = created_by
+        if profile := Profile.objects.filter(
+            id=profile_id, is_active=True
+        ).first():
+            recipients_list = [profile.user.email]
+            context = {
+                "url": settings.DOMAIN_NAME,
+                "user": profile.user,
+                "account": account,
+                "created_by": created_by,
+            }
+
             subject = "Assigned a account for you."
             html_content = render_to_string(
                 "assigned_to/account_assigned.html", context=context

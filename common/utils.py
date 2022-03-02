@@ -560,40 +560,27 @@ def return_complete_address(self):
     if self.address_line:
         address += self.address_line
     if self.street:
-        if address:
-            address += ", " + self.street
-        else:
-            address += self.street
+        address += f", {self.street}" if address else self.street
     if self.city:
-        if address:
-            address += ", " + self.city
-        else:
-            address += self.city
+        address += f", {self.city}" if address else self.city
     if self.state:
-        if address:
-            address += ", " + self.state
-        else:
-            address += self.state
+        address += f", {self.state}" if address else self.state
     if self.postcode:
-        if address:
-            address += ", " + self.postcode
-        else:
-            address += self.postcode
+        address += f", {self.postcode}" if address else self.postcode
     if self.country:
         if address:
-            address += ", " + self.get_country_display()
+            address += f", {self.get_country_display()}"
         else:
             address += self.get_country_display()
     return address
 
 
 def get_client_ip(request):
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(",")[0]
-    else:
-        ip = request.META.get("REMOTE_ADDR")
-    return ip
+    return (
+        x_forwarded_for.split(",")[0]
+        if (x_forwarded_for := request.META.get("HTTP_X_FORWARDED_FOR"))
+        else request.META.get("REMOTE_ADDR")
+    )
 
 
 def convert_to_custom_timezone(custom_date, custom_timezone, to_utc=False):
@@ -616,9 +603,5 @@ def append_str_to(append_to: str, *args, sep=", ", **kwargs):
     """
     append_to = append_to or ""
     result_list = [append_to] + list(args) + list(kwargs.values())
-    data = False
-    for item in result_list:
-        if item:
-            data = True
-            break
+    data = any(result_list)
     return f"{sep}".join(filter(len, result_list)) if data else ""

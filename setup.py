@@ -16,8 +16,10 @@ for dirpath, dirnames, filenames in os.walk(PROJECT_NAME):
     if "__init__.py" in filenames:
         continue
     elif filenames:
-        for f in filenames:
-            data_files.append(os.path.join(dirpath[len(PROJECT_NAME) + 1 :], f))
+        data_files.extend(
+            os.path.join(dirpath[len(PROJECT_NAME) + 1 :], f)
+            for f in filenames
+        )
 
 setup(
     name="django-crm",

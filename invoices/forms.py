@@ -32,10 +32,6 @@ class InvoiceForm(forms.ModelForm):
             self.fields["accounts"].queryset = Account.objects.filter(
                 status="open", company=request_obj.company
             )
-        # elif request_user.google.all():
-        #     self.fields['assigned_to'].queryset = User.objects.none()
-        #     self.fields['accounts'].queryset = Account.objects.filter(status='open').filter(
-        #         Q(created_by=request_user) | Q(assigned_to=request_user))
         elif request_user.role == "USER":
             self.fields["assigned_to"].queryset = User.objects.filter(
                 role="ADMIN", company=request_obj.company
@@ -44,9 +40,6 @@ class InvoiceForm(forms.ModelForm):
                 status="open",
                 company=request_obj.company,
             ).filter(Q(created_by=request_user) | Q(assigned_to=request_user))
-        else:
-            pass
-
         self.fields["teams"].required = False
         self.fields["phone"].widget.attrs.update({"placeholder": "+911234567890"})
         self.fields["invoice_title"].required = True

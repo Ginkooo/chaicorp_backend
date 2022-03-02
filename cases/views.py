@@ -126,9 +126,9 @@ class CaseListView(APIView, LimitOffsetPagination):
 
             if params.get("contacts"):
                 contacts_list = json.loads(params.get("contacts"))
-                contacts = Contact.objects.filter(
-                    id__in=contacts_list, org=request.org)
-                if contacts:
+                if contacts := Contact.objects.filter(
+                    id__in=contacts_list, org=request.org
+                ):
                     cases_obj.contacts.add(*contacts)
 
             if params.get("teams"):
@@ -141,9 +141,9 @@ class CaseListView(APIView, LimitOffsetPagination):
             if params.get("assigned_to"):
                 assinged_to_list = json.loads(
                     params.get("assigned_to"))
-                profiles = Profile.objects.filter(
-                    id__in=assinged_to_list, org=request.org, is_active=True)
-                if profiles:
+                if profiles := Profile.objects.filter(
+                    id__in=assinged_to_list, org=request.org, is_active=True
+                ):
                     cases_obj.assigned_to.add(*profiles)
 
             if self.request.FILES.get("case_attachment"):
@@ -194,18 +194,21 @@ class CaseDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == cases_object.created_by)
                 or (self.request.profile in cases_object.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         serializer = CaseCreateSerializer(
             cases_object,
@@ -223,9 +226,9 @@ class CaseDetailView(APIView):
             cases_object.contacts.clear()
             if params.get("contacts"):
                 contacts_list = json.loads(params.get("contacts"))
-                contacts = Contact.objects.filter(
-                    id__in=contacts_list, org=request.org)
-                if contacts:
+                if contacts := Contact.objects.filter(
+                    id__in=contacts_list, org=request.org
+                ):
                     cases_object.contacts.add(*contacts)
 
             cases_object.teams.clear()
@@ -240,9 +243,9 @@ class CaseDetailView(APIView):
             if params.get("assigned_to"):
                 assinged_to_list = json.loads(
                     params.get("assigned_to"))
-                profiles = Profile.objects.filter(
-                    id__in=assinged_to_list, org=request.org, is_active=True)
-                if profiles:
+                if profiles := Profile.objects.filter(
+                    id__in=assinged_to_list, org=request.org, is_active=True
+                ):
                     cases_object.assigned_to.add(*profiles)
 
             if self.request.FILES.get("case_attachment"):
@@ -283,15 +286,18 @@ class CaseDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if self.request.profile != self.object.created_by:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and self.request.profile != self.object.created_by
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You do not have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         self.object.delete()
         return Response(
             {"error": False, "message": "Case Deleted Successfully."},
@@ -308,30 +314,28 @@ class CaseDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        context = {}
-        context["cases_obj"] = CaseSerializer(self.cases).data
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        context = {"cases_obj": CaseSerializer(self.cases).data}
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == self.cases.created_by)
                 or (self.request.profile in self.cases.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        comment_permission = False
-
-        if (
+        comment_permission = bool((
             self.request.profile == self.cases.created_by
             or self.request.profile.is_admin
             or self.request.profile.role == "ADMIN"
-        ):
-            comment_permission = True
-
+        ))
         if self.request.profile.is_admin or self.request.profile.role == "ADMIN":
             users_mention = list(
                 Profile.objects.filter(
@@ -384,24 +388,26 @@ class CaseDetailView(APIView):
             )
         context = {}
         comment_serializer = CommentSerializer(data=params)
-        if self.request.profile.role != "ADMIN" and not self.request.profile.is_admin:
-            if not (
+        if (
+            self.request.profile.role != "ADMIN"
+            and not self.request.profile.is_admin
+            and not (
                 (self.request.profile == self.cases_obj.created_by)
                 or (self.request.profile in self.cases_obj.assigned_to.all())
-            ):
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You don't have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-        if comment_serializer.is_valid():
-            if params.get("comment"):
-                comment_serializer.save(
-                    case_id=self.cases_obj.id,
-                    commented_by_id=self.request.profile.id,
-                )
+            )
+        ):
+            return Response(
+                {
+                    "error": True,
+                    "errors": "You don't have Permission to perform this action",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if comment_serializer.is_valid() and params.get("comment"):
+            comment_serializer.save(
+                case_id=self.cases_obj.id,
+                commented_by_id=self.request.profile.id,
+            )
 
         if self.request.FILES.get("case_attachment"):
             attachment = Attachments()

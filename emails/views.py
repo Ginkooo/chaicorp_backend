@@ -29,27 +29,26 @@ def emails_list(request):
 def email(request):
     if request.method == "POST":
         form = EmailForm(request.POST, request.FILES)
-        if form.is_valid():
-            subject = request.POST.get("subject", "")
-            message = request.POST.get("message", "")
-            from_email = request.POST.get("from_email", "")
-            to_email = request.POST.get("to_email", "")
-            file = request.FILES.get("files", None)
-            status = request.POST.get("email_draft", "")
-            email = EmailMessage(subject, message, from_email, [to_email])
-            email.content_subtype = "html"
-            f = form.save()
-            if file is not None:
-                email.attach(file.name, file.read(), file.content_type)
-                f.file = file
-            if status:
-                f.status = "draft"
-            else:
-                email.send(fail_silently=False)
-            f.save()
-            return HttpResponseRedirect(reverse("emails:list"))
-        else:
+        if not form.is_valid():
             return render(request, "create_mail.html", {"form": form})
+        subject = request.POST.get("subject", "")
+        message = request.POST.get("message", "")
+        from_email = request.POST.get("from_email", "")
+        to_email = request.POST.get("to_email", "")
+        file = request.FILES.get("files", None)
+        status = request.POST.get("email_draft", "")
+        email = EmailMessage(subject, message, from_email, [to_email])
+        email.content_subtype = "html"
+        f = form.save()
+        if file is not None:
+            email.attach(file.name, file.read(), file.content_type)
+            f.file = file
+        if status:
+            f.status = "draft"
+        else:
+            email.send(fail_silently=False)
+        f.save()
+        return HttpResponseRedirect(reverse("emails:list"))
     else:
         form = EmailForm()
         return render(request, "create_mail.html", {"form": form})
